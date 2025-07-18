@@ -1,6 +1,23 @@
 # mock_db.py
 
-patients = []  # List of patient dicts
+# Example patient data structure with real data fields for advanced adherence prediction
+patients = [
+    {
+        'name': 'Jane Doe',
+        'contact': '+254700000001',
+        'age': 55,
+        'num_medications': 3,
+        'recent_adherence_rate': 0.7,  # e.g., proportion of doses taken in last 7 days
+        'feedback_count': 8,           # number of feedback entries in last 7 days
+        # ... other fields ...
+    },
+    # ... more patients ...
+]
+
+# When adding or updating a patient, ensure these fields are set and updated as new feedback arrives.
+# When retrieving patients for risk prediction, extract these fields for the model input.
+
+
 schedules = []  # List of schedule dicts
 feedback_log = []  # List of feedback dicts
 

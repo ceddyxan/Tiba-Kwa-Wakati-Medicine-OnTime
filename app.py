@@ -1,12 +1,17 @@
 import streamlit as st
 import pandas as pd
 from mock_db import add_patient, get_patients, add_schedule, get_schedules, add_feedback, get_feedback
-from ml_model import predict_nonadherence, risk_trend, detect_anomalies
+from ml_model import predict_nonadherence, risk_trend, detect_anomalies, predict_adherence_risk, predict_dropout_risk, suggest_interventions
 import datetime
 from translate import translate
 import scheduler
 from datetime import datetime, time
 import re
+from forecasting import forecast_adherence_arima
+from feedback_analysis import analyze_feedback
+from anomaly_detection import detect_anomalies_kmeans
+from scheduler import recommend_optimal_time
+import altair as alt
 
 # Supported countries and languages
 COUNTRIES = ["Kenya", "Uganda", "Tanzania", "Rwanda"]
@@ -24,7 +29,7 @@ st.sidebar.markdown("""
 - AI-powered adherence prediction
 - Visual dashboard
 """)
-st.sidebar.info("Created for Kenya, Uganda, Tanzania, Rwanda 🇰🇪🇺🇬🇹🇿🇷🇼")
+st.sidebar.info("Created for Kenya, Uganda, Tanzania, Rwanda")
 
 # --- Main Tabs ---
 tabs = st.tabs(["🏠 Home", "➕ Register", "📊 Dashboard"])
@@ -52,6 +57,8 @@ with tabs[1]:
         "Isoniazid (TB)", "Rifampicin (TB)", "Ethambutol (TB)", "Pyrazinamide (TB)",
         "Other (type below)"
     ]
+    # Patient Registration Form (initial version)
+    st.header("Patient Registration")
     with st.form("register_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -59,6 +66,7 @@ with tabs[1]:
             contact = st.text_input("📱 Phone Number (with country code)")
             country = st.selectbox("🌍 Country", COUNTRIES)
             start_date = st.date_input("📅 Start Date", value=datetime.today())
+            age = st.number_input("Age", min_value=0, max_value=120, value=30)
         with col2:
             language = st.selectbox("🗣️ Preferred Language", LANGUAGES)
             medication_select = st.selectbox("💊 Medication Name (search or select)", chronic_meds, index=0)
@@ -67,11 +75,9 @@ with tabs[1]:
             if medication_select == "Other (type below)":
                 custom_med = st.text_input("💊 Enter Medication Name (if not in list)")
                 medication = custom_med
-            # 24-hour time picker only
             med_time = st.time_input("⏰ Time (24-hour format)", value=time(8,0))
-            # (Removed AM/PM radio)
+            num_medications = st.number_input("Number of Medications", min_value=1, max_value=20, value=1)
         submitted = st.form_submit_button("Register Patient")
-        # Validation
         errors = []
         if submitted:
             if not name:
@@ -92,16 +98,16 @@ with tabs[1]:
                 for err in errors:
                     st.error(err)
             else:
-                # Convert time to 12-hour format with AM/PM
                 hour = med_time.hour
                 minute = med_time.minute
-                # (Removed AM/PM logic)
                 schedule_str = f"{hour:02d}:{minute:02d}"
                 patient = {
                     "name": name,
                     "contact": contact,
                     "country": country,
                     "language": language,
+                    "age": age,
+                    "num_medications": num_medications,
                 }
                 add_patient(patient)
                 sched = {
@@ -226,8 +232,142 @@ with tabs[2]:
                         }
                         add_feedback(feedback)
                         st.success("Feedback logged.")
-                        st.experimental_rerun()
+                        # st.experimental_rerun()  # Removed due to AttributeError in current Streamlit version
         st.markdown("---")
+
+    st.header("Advanced Adherence Prediction (All Patients)")
+    risk_data = []
+    feature_importances = {}
+    for patient in patients:
+        # Calculate recent adherence rate
+        adherence_history = patient.get('adherence_history', [])
+        if adherence_history:
+            recent_adherence_rate = sum(adherence_history[-7:]) / min(len(adherence_history), 7)
+        else:
+            recent_adherence_rate = 0.0
+        # Calculate feedback count in last 7 days
+        feedback_count = 0
+        now = datetime.now()
+        for feedback in feedback_log:
+            if feedback.get('patient_contact') == patient['contact']:
+                ts = feedback.get('timestamp')
+                if ts and isinstance(ts, datetime) and (now - ts).days < 7:
+                    feedback_count += 1
+        features = [
+            recent_adherence_rate,
+            patient.get('age', 40),
+            patient.get('num_medications', 2),
+            feedback_count
+        ]
+        prob, label, importance = predict_adherence_risk(features)
+        risk_data.append({'Patient': patient['name'], 'Risk Probability': prob, 'Risk Level': 'High' if label else 'Low'})
+        feature_importances[patient['name']] = importance
+
+    df_risk = pd.DataFrame(risk_data).sort_values('Risk Probability', ascending=False)
+
+    # Add a color column based on risk probability
+
+    def risk_color(prob):
+        if prob > 0.7:
+            return 'High'
+        elif prob > 0.4:
+            return 'Medium'
+        else:
+            return 'Low'
+
+    df_risk['RiskColor'] = df_risk['Risk Probability'].apply(risk_color)
+    color_scale = alt.Scale(domain=['High', 'Medium', 'Low'], range=['red', 'orange', 'green'])
+
+    chart = alt.Chart(df_risk).mark_bar().encode(
+        x=alt.X('Risk Probability:Q', scale=alt.Scale(domain=[0, 1])),
+        y=alt.Y('Patient:N', sort='-x'),
+        color=alt.Color('RiskColor:N', scale=color_scale, legend=alt.Legend(title="Risk Level")),
+        tooltip=['Patient', 'Risk Probability', 'Risk Level']
+    ).properties(height=400)
+    st.altair_chart(chart, use_container_width=True)
+
+    # Sortable, color-coded table
+    def color_risk(val):
+        if val > 0.7:
+            color = 'red'
+        elif val > 0.4:
+            color = 'orange'
+        else:
+            color = 'green'
+        return f'background-color: {color}'
+
+    st.dataframe(df_risk.style.applymap(color_risk, subset=['Risk Probability']))
+
+    # Expanders for per-patient feature importance
+    for patient in df_risk['Patient']:
+        with st.expander(f"Feature Importance for {patient}"):
+            imp = feature_importances[patient]
+            sorted_imp = sorted(imp.items(), key=lambda x: x[1], reverse=True)
+            for fname, score in sorted_imp:
+                st.write(f"- {fname}: {score:.2f}")
+
+    st.header("Personalized Adherence Forecast (All Patients)")
+    forecast_dict = {}
+    for patient in patients:
+        history = patient.get('adherence_history', [1, 1, 0, 1, 1, 0, 1])
+        forecast = forecast_adherence_arima(history, steps=7)
+        forecast_dict[patient['name']] = forecast
+    if forecast_dict:
+        df_forecast = pd.DataFrame(forecast_dict)
+        df_forecast.index = [f"Day {i+1}" for i in range(7)]
+        st.line_chart(df_forecast)
+
+    st.header("Recent Patient Feedback Analysis")
+    # Example: assume feedback_log is a list of dicts with 'patient', 'text', and 'timestamp'
+    for feedback in feedback_log[-10:]:  # Show last 10 feedback entries
+        analysis = analyze_feedback(feedback.get('text', ''))
+        st.subheader(f"Feedback from {feedback['patient_contact']} at {feedback['timestamp']}")
+        st.write(f"Text: {feedback.get('text', '')}")
+        st.write(f"Sentiment: {analysis['sentiment']} (polarity: {analysis['polarity']:.2f})")
+        st.write(f"Detected Intents: {', '.join(analysis['intents'])}")
+        if analysis['flag']:
+            st.markdown("**:red[Flagged for review]**")
+
+    st.header("Anomaly & Event Detection")
+    # Assume adherence_histories is a list of all patients' adherence histories
+    adherence_histories = [p.get('adherence_history', [1,1,1,1,1,1,1]) for p in patients]
+    anomalies = detect_anomalies_kmeans(adherence_histories)
+    for patient, is_anomaly in zip(patients, anomalies):
+        if is_anomaly:
+            st.warning(f"Anomaly detected in adherence for {patient['name']}")
+
+    st.header("Predictive Analytics & Interventions")
+    for patient in patients:
+        # Calculate recent adherence rate
+        adherence_history = patient.get('adherence_history', [])
+        if adherence_history:
+            recent_adherence_rate = sum(adherence_history[-7:]) / min(len(adherence_history), 7)
+        else:
+            recent_adherence_rate = 0.0
+        # Calculate feedback count in last 7 days
+        feedback_count = 0
+        now = datetime.now()
+        for feedback in feedback_log:
+            if feedback.get('patient_contact') == patient['contact']:
+                ts = feedback.get('timestamp')
+                if ts and isinstance(ts, datetime) and (now - ts).days < 7:
+                    feedback_count += 1
+        negative_feedback_count = patient.get('negative_feedback_count', 0)
+        prob, label = predict_dropout_risk(recent_adherence_rate, negative_feedback_count)
+        st.subheader(f"Patient: {patient['name']}")
+        st.write(f"Dropout/complication risk: {prob:.2f} ({'High' if label else 'Low'})")
+        feedback_analysis = patient.get('last_feedback_analysis', {'intents': []})
+        interventions = suggest_interventions(label, feedback_analysis)
+        st.write("Suggested interventions:")
+        for intervention in interventions:
+            st.write(f"- {intervention}")
+
+    st.header("AI-Driven Scheduling Recommendations")
+    for patient in patients:
+        history = patient.get('adherence_history', [1, 0, 1, 0, 1, 1])
+        times = patient.get('dose_times', ['8am', '8pm', '8am', '8pm', '8am', '8pm'])
+        recommended_time = recommend_optimal_time(history, times)
+        st.write(f"Recommended optimal time for {patient['name']}: {recommended_time}")
 
 # --- Footer ---
 st.markdown("""
