@@ -39,16 +39,16 @@ with tabs[0]:
     st.markdown("""
     <h1 style='text-align: center; color: #2E86C1;'>Tiba Kwa Wakati 💊</h1>
     <h4 style='text-align: center; color: #117A65;'>Your smart, multilingual medicine reminder for East Africa</h4>
-    st.image(
-    "https://cdn.pixabay.com/photo/2017/01/31/13/14/medicine-2028240_1280.png",
-    width=200,
-    caption="Medicine Reminder"
-)
     <br>
     <p style='text-align: center;'>Easily register patients, send reminders in their language, and track adherence with AI-powered insights.</p>
     """, unsafe_allow_html=True)
+    st.image(
+        "https://cdn.pixabay.com/photo/2017/01/31/13/14/medicine-2028240_1280.png",
+        width=200,
+        caption="Medicine Reminder"
+    )
     st.success("Get started by registering a patient or viewing the dashboard.")
-
+    
 # --- Register Tab ---
 with tabs[1]:
     st.header("➕ Register Patient & Medication Schedule")
