@@ -1,9 +1,8 @@
 # translate.py
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 
-def translate(text, target_language):
-    if target_language.lower() == "english":
-        return text
+def translate(text, target='sw'):
+    return GoogleTranslator(source='auto', target=target).translate(text)
     try:
         translator = Translator()
         lang_map = {
