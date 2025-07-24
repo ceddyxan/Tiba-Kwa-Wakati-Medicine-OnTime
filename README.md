@@ -25,6 +25,12 @@ A multilingual AI-powered medicine reminder system for East Africa (Kenya, Ugand
 ## Overview
 Tiba Kwa Wakati is a demo healthcare platform that helps patients remember to take their medication on time, in their preferred language, and enables healthcare workers to monitor adherence. The system uses AI to predict non-adherence risk and supports SMS, WhatsApp, and voice reminders (mocked for demo/testing).
 
+## Live Demo
+
+You can try the app live here:  
+[https://tiba-kwa-wakati-medicine-ontime-fwu7cq2whi72rkdnkhmxeb.streamlit.app](https://tiba-kwa-wakati-medicine-ontime-fwu7cq2whi72rkdnkhmxeb.streamlit.app)
+
+
 ## Why Tiba Kwa Wakati?
 - **Addresses medication non-adherence** in East Africa, a major cause of poor health outcomes.
 - **Bridges language barriers** with real-time translation and multilingual support.
