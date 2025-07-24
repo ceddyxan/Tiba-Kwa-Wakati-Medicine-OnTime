@@ -30,6 +30,11 @@ Tiba Kwa Wakati is a demo healthcare platform that helps patients remember to ta
 You can try the app live here:  
 [https://tiba-kwa-wakati-medicine-ontime-fwu7cq2whi72rkdnkhmxeb.streamlit.app](https://tiba-kwa-wakati-medicine-ontime-fwu7cq2whi72rkdnkhmxeb.streamlit.app)
 
+## Pitch Deck
+
+You can view the project pitch deck here:  
+[https://gamma.app/docs/Tiba-Kwa-Wakati-dwo6l9b6q3l049y](https://gamma.app/docs/Tiba-Kwa-Wakati-dwo6l9b6q3l049y)
+
 
 ## Why Tiba Kwa Wakati?
 - **Addresses medication non-adherence** in East Africa, a major cause of poor health outcomes.
