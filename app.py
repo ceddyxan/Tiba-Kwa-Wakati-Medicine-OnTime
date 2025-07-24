@@ -46,6 +46,7 @@ with tabs[0]:
         "https://images.unsplash.com/photo-1511174511562-5f7f18b874f8?auto=format&fit=crop&w=400&q=80",
         width=200,
         caption="Medicine Reminder"
+        align="center"
     )
     st.success("Get started by registering a patient or viewing the dashboard.")
     
