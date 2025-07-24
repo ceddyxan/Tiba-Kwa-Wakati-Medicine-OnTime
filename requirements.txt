@@ -7,3 +7,5 @@ textblob
 flask 
 deep-translator
 apscheduler
+twilio
+altair
